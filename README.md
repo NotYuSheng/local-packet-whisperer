@@ -1,4 +1,3 @@
-![](gifs/lpw_logo_small.png)
 # Local Packet Whisperer (LPW)
 
 A privacy-focused PCAP analysis tool powered by local and cloud LLMs. Chat with your network captures using AI, with support for both Ollama (local) and OpenAI-compatible APIs.
