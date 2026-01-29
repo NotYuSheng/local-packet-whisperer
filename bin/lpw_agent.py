@@ -9,7 +9,9 @@ class LPWCrew:
         self.llm_host = llm_host
         self.llm_port = llm_port
         self.model = model
-        self.llm = LLM(model=model, base_url=f'http://{llm_host}:{llm_port}/v1', api_key=os.getenv('OPENAI_API_KEY'))
+        # Add 'openai/' prefix for litellm to recognize OpenAI-compatible endpoints
+        litellm_model = f"openai/{model}" if not model.startswith("openai/") else model
+        self.llm = LLM(model=litellm_model, base_url=f'http://{llm_host}:{llm_port}/v1', api_key=os.getenv('OPENAI_API_KEY'))
         self.loadConfig()
         self.crew = Crew(
             agents = [self.sne_agent],
