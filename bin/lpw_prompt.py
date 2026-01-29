@@ -13,6 +13,8 @@ def returnSystemText(pcap_data : str) -> str:
     return PACKET_WHISPERER
 
 oClient = OllamaClient()
+# Initialize with environment variables
+oClient.setServer(returnValue('llm_server'), returnValue('llm_server_port'))
 
 def setLLMServer(server, port):
     oClient.setServer(server, port)
