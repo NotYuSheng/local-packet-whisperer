@@ -1,16 +1,22 @@
 import streamlit as st
-import ollama
-from ollama import Client
+from openai import OpenAI
 from typing import List
+import os
 
 class OllamaClient():
 
     def __init__(self, server="127.0.0.1"):
         self.messages = []
-        self.client = Client(host=f'http://{server}:11434')
-    
-    def setServer(self,server, port):
-        self.client = Client(host=f'http://{server}:{port}')
+        self.client = OpenAI(
+            base_url=f'http://{server}:11434/v1',
+            api_key=os.getenv('OPENAI_API_KEY')
+        )
+
+    def setServer(self, server, port):
+        self.client = OpenAI(
+            base_url=f'http://{server}:{port}/v1',
+            api_key=os.getenv('OPENAI_API_KEY')
+        )
     
     def clear_history(self):
         self.messages.clear()
@@ -43,22 +49,28 @@ class OllamaClient():
                 m['content'] = system_message
     
     def chat(self, prompt:str, model: str, temp: float, system:str = "default") -> str:
-        options = dict({'temperature' : temp})
         message = {}
         message['role'] = 'user'
         message['content'] = prompt
         self.messages.append(message)
         response = None
         try:
-            response = self.client.chat(model=model, messages=self.messages, options=options)
+            response = self.client.chat.completions.create(
+                model=model,
+                messages=self.messages,
+                temperature=temp
+            )
         except Exception as e:
             st.error(f'Error Occured : {e} ', icon="🚨")
             st.stop()
-        self.messages.append(response['message'])
-        return response['message']['content']
+        assistant_message = {
+            'role': 'assistant',
+            'content': response.choices[0].message.content
+        }
+        self.messages.append(assistant_message)
+        return response.choices[0].message.content
 
     def chat_stream(self, prompt:str, model: str, temp: float, system:str = "default"):
-        options = dict({'temperature' : temp})
         message = {}
         stream = None
         if system != 'default' and not self.check_system_message():
@@ -68,7 +80,12 @@ class OllamaClient():
         message['content'] = prompt
         self.messages.append(message)
         try:
-            stream = self.client.chat(model=model, messages=self.messages, options=options, stream=True)
+            stream = self.client.chat.completions.create(
+                model=model,
+                messages=self.messages,
+                temperature=temp,
+                stream=True
+            )
         # the caller should call append_history
         except Exception as e:
             st.error(f'Error Occured : {e} ', icon="🚨")
@@ -79,11 +96,9 @@ class OllamaClient():
         retList = []
         is_Connected = False
         try:
-            model_list = self.client.list()  
-            models = model_list['models']
-            #print(f'#### models {models}')
-            for model in models:
-                retList.append(model['model'])
+            model_list = self.client.models.list()
+            for model in model_list.data:
+                retList.append(model.id)
             is_Connected = True
         except Exception as e:
             print(f'Error Occured : {e} ')
@@ -99,9 +114,10 @@ if __name__ == '__main__':
     #    contents = ""
     #    AiMessage = {}
     #    for chunk in response:
-    #        content = chunk['message']['content']
-    #        print(content, end='', flush=True)
-    #        contents += content
+    #        if chunk.choices[0].delta.content:
+    #            content = chunk.choices[0].delta.content
+    #            print(content, end='', flush=True)
+    #            contents += content
     #    AiMessage['role'] = 'assistant'
     #    AiMessage['content'] = contents
     #    client.append_history(AiMessage)
