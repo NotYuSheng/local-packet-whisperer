@@ -4,11 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: local-packet-whisperer
-    ports:
-      - "8501:8501"
+    network_mode: "host"
     environment:
       # OpenAI API Key - set this if using OpenAI or compatible API
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-not-needed}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-token-abc123}
       # LLM Server settings
       - LLM_SERVER=${LLM_SERVER:-127.0.0.1}
       - LLM_SERVER_PORT=${LLM_SERVER_PORT:-11434}
@@ -18,28 +17,26 @@ services:
       # Mount local pcap files (optional)
       - ${PCAP_DIR:-./pcaps}:/pcaps:ro
     restart: unless-stopped
-    networks:
-      - lpw-network
 
-  # Optional: Ollama service for local LLM
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama-data:/root/.ollama
-    restart: unless-stopped
-    networks:
-      - lpw-network
-    # Uncomment below for GPU support (requires nvidia-docker)
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: 1
-    #           capabilities: [gpu]
+  # # Optional: Ollama service for local LLM
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   ports:
+  #     - "11434:11434"
+  #   volumes:
+  #     - ollama-data:/root/.ollama
+  #   restart: unless-stopped
+  #   networks:
+  #     - lpw-network
+  #   # Uncomment below for GPU support (requires nvidia-docker)
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: 1
+  #   #           capabilities: [gpu]
 
 volumes:
   lpw-data:
