@@ -2,13 +2,14 @@ import streamlit as st
 from lpw_init import *
 from crewai import Agent, Task, Crew, LLM
 import yaml
+import os
 
 class LPWCrew:
     def __init__(self, llm_host="127.0.0.1", llm_port="11434", model="llama3.1:latest"):
         self.llm_host = llm_host
         self.llm_port = llm_port
         self.model = model
-        self.llm = LLM(model=f'ollama/{model}', base_url=f'http://{llm_host}:{llm_port}', api_key='could be anything')
+        self.llm = LLM(model=model, base_url=f'http://{llm_host}:{llm_port}/v1', api_key=os.getenv('OPENAI_API_KEY'))
         self.loadConfig()
         self.crew = Crew(
             agents = [self.sne_agent],
