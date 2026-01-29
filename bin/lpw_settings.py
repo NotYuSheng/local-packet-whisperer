@@ -32,6 +32,39 @@ with col2:
 with col3:
     st.session_state['ngap'] = st.checkbox("NGAP",value=returnValue('ngap')) #38412
 
+st.divider()
+
+with st.expander(label='**RAG Settings** (for Large PCAP Files)', expanded=False, icon=":material/search:"):
+    st.markdown('Enable RAG (Retrieval Augmented Generation) for efficient analysis of large PCAP files (500MB+)')
+    st.session_state['use_rag'] = st.toggle(label='Enable RAG', value=returnValue('use_rag'))
+
+    if returnValue('use_rag'):
+        st.session_state['rag_group_size'] = st.number_input(
+            label="Packets per group",
+            value=returnValue('rag_group_size'),
+            min_value=5,
+            max_value=50,
+            step=5,
+            help="Number of packets to group together for indexing (default: 10)"
+        )
+        st.session_state['rag_retrieve_k'] = st.number_input(
+            label="Groups to retrieve per query",
+            value=returnValue('rag_retrieve_k'),
+            min_value=3,
+            max_value=20,
+            step=1,
+            help="How many packet groups to retrieve for each question (default: 5)"
+        )
+        st.session_state['rag_max_index'] = st.number_input(
+            label="Max packets to index (0 = unlimited)",
+            value=returnValue('rag_max_index'),
+            min_value=0,
+            max_value=1000000,
+            step=10000,
+            help="Limit indexing to first N packets (0 = index all packets)"
+        )
+        st.info('💡 Note: RAG requires ChromaDB. Install with: `pip install chromadb`', icon='ℹ️')
+
 def glowing_header_text(header, text):
     st.markdown(f"""
         <div style="display: flex; align-items: center;">

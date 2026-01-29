@@ -3,11 +3,11 @@ from lpw_init import *
 from lpw_prompt import *
 from lpw_packet import *
 from lpw_agent import LPWCrew
+from lpw_rag import PcapRAG
 import os
 import time
 from streamlit_extras.tags import tagger_component
 from importlib.metadata import version, PackageNotFoundError
-import os
 
 def get_lpw_version():
     try:
@@ -144,48 +144,49 @@ def getEnabledFilters():
 with st.sidebar:
     if returnValue('selected_model') == 'Undefined':
         loadDefaultSettings()
-    st.metric("Selected Model ✅", returnValue('selected_model'))
-    st.metric("Plugged to 🔌 & connection status 🚦", f"{returnValue('llm_server')} {renderConnection(returnValue('llm_server_connection_status'))}")
+    st.markdown("**Selected Model ✅**")
+    st.markdown(f"<small>{returnValue('selected_model')}</small>", unsafe_allow_html=True)
+    st.markdown("**Plugged to 🔌 & connection status 🚦**")
+    st.markdown(f"<small>{returnValue('llm_server')} {renderConnection(returnValue('llm_server_connection_status'))}</small>", unsafe_allow_html=True)
     getEnabledFilters()
-    st.metric("Streaming 〰️", returnValue('streaming_enabled'))
-    st.metric("Context Length 📏", f"{returnValue('max_context_length')} tokens ({int(returnValue('pcap_context_ratio')*100)}% for PCAP)")
-
-    # Show load mode with appropriate emoji
-    load_mode_display = {
-        'full': '🗂️ Full',
-        'summary': '📊 Summary',
-        'quick': '⚡ Quick'
-    }.get(returnValue('pcap_load_mode'), returnValue('pcap_load_mode'))
-    st.metric("PCAP Load Mode 🔄", load_mode_display)
+    st.markdown("**Streaming 〰️**")
+    st.markdown(f"<small>{returnValue('streaming_enabled')}</small>", unsafe_allow_html=True)
+    st.markdown("**Context Length 📏**")
+    st.markdown(f"<small>{returnValue('max_context_length')} tokens ({int(returnValue('pcap_context_ratio')*100)}% for PCAP)</small>", unsafe_allow_html=True)
 
     packetFile = st.file_uploader(label='Upload either a PCAP or PCAPNG file to chat', accept_multiple_files=False, type=['pcap','pcapng'])
     if packetFile:
         st.session_state['pcap_fname'] = packetFile.name
-        load_mode = returnValue('pcap_load_mode')
-        spinner_text = {
-            'full': '#### Loading full packet data... 🥣🥣🥣',
-            'summary': '#### Generating PCAP summary... 📊📊📊',
-            'quick': '#### Quick sampling PCAP... ⚡⚡⚡'
-        }.get(load_mode, '#### Processing PCAP...')
 
-        with st.spinner(spinner_text):
-            with open(f'{packetFile.name}', 'wb') as f:
-                f.write(packetFile.read())
-            filters, decodes = getFiltersAndDecodeInfo()
-            st.session_state['pcap_filters'] = filters
+        # Save uploaded file
+        with open(f'{packetFile.name}', 'wb') as f:
+            f.write(packetFile.read())
 
-            # Choose loading strategy based on PCAP_LOAD_MODE
-            if load_mode == 'summary':
+        filters, decodes = getFiltersAndDecodeInfo()
+        st.session_state['pcap_filters'] = filters
+
+        # Check if RAG is enabled
+        use_rag = returnValue('use_rag')
+
+        if use_rag:
+            # RAG Mode: Index packets for semantic search
+            with st.spinner('#### Indexing packets with RAG... 🔍🔍🔍'):
+                rag = PcapRAG(pcap_file=f'{packetFile.name}', filter=filters)
+                stats = rag.index_packets(
+                    group_size=returnValue('rag_group_size'),
+                    max_packets=returnValue('rag_max_index') if returnValue('rag_max_index') > 0 else None
+                )
+                st.session_state['rag_instance'] = rag
+                st.session_state['pcap_data'] = f"PCAP indexed with RAG. {stats.get('total_groups', 0)} packet groups available for semantic search."
+                st.success(f'🔍 RAG enabled: Indexed {stats.get("total_packets", 0)} packets in {stats.get("total_groups", 0)} groups', icon='✅')
+        else:
+            # Summary Mode: Generate statistical overview
+            with st.spinner('#### Generating PCAP summary... 📊📊📊'):
                 st.session_state['pcap_data'] = getPcapSummary(input_file=f'{packetFile.name}', filter=filters)
-                st.info('📊 Using summary mode - statistical overview loaded. Ask questions for detailed packet analysis.', icon='ℹ️')
-            elif load_mode == 'quick':
-                st.session_state['pcap_data'] = getQuickPcapStats(input_file=f'{packetFile.name}', filter=filters)
-                st.info('⚡ Using quick mode - sampled first 1000 packets. Ask questions for detailed analysis.', icon='ℹ️')
-            else:  # 'full' mode
-                st.session_state['pcap_data'] = getPcapData(input_file=f'{packetFile.name}', filter=filters, decode_info=decodes)
+                st.info('📊 Statistical overview loaded. Ask questions for detailed packet analysis.', icon='ℹ️')
 
-            initLLM(pcap_data=returnValue('pcap_data'))
-            #os.remove(f'{packetFile.name}')
+        initLLM(pcap_data=returnValue('pcap_data'))
+        #os.remove(f'{packetFile.name}')
     else:
         st.session_state['pcap_fname'] = "None 🚫"
 
@@ -200,8 +201,8 @@ with col2:
 
 
 if not returnValue('llm_server_connection_status'):
-    st.error('LPW Cannot talk to the remote 🦙 Ollama Server 🦙', icon='🚨')
-    st.info('Please troubleshoot the **connection** or Update the **LLM Server Settings** in LPW Setting ⚙️ Page', icon='💡')
+    st.error('LPW cannot connect to the LLM server', icon='🚨')
+    st.info('Please troubleshoot the **connection** or update the **LLM Server Settings** in LPW Setting ⚙️ Page', icon='💡')
 else :
     #st.markdown('#### Step 1️⃣ 👉🏻 Build a knowledge base')
     #packetFile = st.file_uploader(label='Upload either a PCAP or PCAPNG file to chat', accept_multiple_files=False, type=['pcap','pcapng'])
@@ -215,7 +216,8 @@ else :
         else:
             chat_container = st.container(height=500)
             prompt = st.chat_input('Enter your prompt', key='prompt_ctrl', disabled=False)
-            st.sidebar.metric("Whispering with 🗣️", returnValue('pcap_fname'))
+            st.sidebar.markdown("**Whispering with 🗣️**")
+            st.sidebar.markdown(f"<small>{returnValue('pcap_fname')}</small>", unsafe_allow_html=True)
             with chat_container.chat_message(name='assistant', avatar=lpw_avatar):
                 st.markdown('Chat with me..')
             for message in returnValue('messages'):
@@ -227,7 +229,33 @@ else :
                     st.markdown(prompt)
                 with chat_container.chat_message(name='assistant', avatar=lpw_avatar):
                     with st.spinner('Processing....'):
-                        full_response = chatWithModel(prompt=prompt, model=returnValue('selected_model'))
+                        # RAG-augmented query if enabled
+                        if returnValue('use_rag') and 'rag_instance' in st.session_state:
+                            rag = st.session_state['rag_instance']
+                            retrieved_groups = rag.query(prompt, top_k=returnValue('rag_retrieve_k'))
+
+                            # Format retrieved packets with citations
+                            if retrieved_groups:
+                                packet_context = "\n\nRelevant packet groups retrieved:\n"
+                                for i, group in enumerate(retrieved_groups, 1):
+                                    packet_context += f"\n[Citation {i}] {group['group_id']}"
+                                    if 'metadata' in group and group['metadata']:
+                                        meta = group['metadata']
+                                        if 'first_packet' in meta and 'last_packet' in meta:
+                                            packet_context += f" (Packets #{meta['first_packet']}-#{meta['last_packet']})"
+                                    packet_context += f"\n{group['text']}\n"
+
+                                instruction = "\n\nIMPORTANT: Base your analysis ONLY on the packet groups shown above. Do NOT add a 'Citations:' section at the end of your response. Do NOT make claims about packet ranges beyond what is shown in the retrieved groups."
+                                augmented_prompt = f"{prompt}{packet_context}{instruction}"
+                                full_response = chatWithModel(prompt=augmented_prompt, model=returnValue('selected_model'))
+
+                                # Add citation info to response
+                                citation_note = f"\n\n---\n*Retrieved {len(retrieved_groups)} packet group(s) for this analysis*"
+                                full_response += citation_note
+                            else:
+                                full_response = chatWithModel(prompt=prompt, model=returnValue('selected_model'))
+                        else:
+                            full_response = chatWithModel(prompt=prompt, model=returnValue('selected_model'))
                         returnValue('messages').append({'role' : 'assistant', 'content' : full_response})
                         if returnValue('streaming_enabled'):
                             message_placeholder = st.empty()

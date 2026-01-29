@@ -1,10 +1,13 @@
 FROM python:3.11-slim
 
 # Install system dependencies including tshark for packet capture
-RUN apt-get update && apt-get install -y \
+# Configure tshark to allow non-superuser packet capture
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y \
     tshark \
     libpcap-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && chmod +x /usr/bin/dumpcap
 
 # Set working directory
 WORKDIR /app
@@ -32,6 +35,8 @@ EXPOSE 8501
 ENV STREAMLIT_SERVER_PORT=8501
 ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
 ENV STREAMLIT_SERVER_HEADLESS=true
+# Allow TShark to run as root (required in Docker)
+ENV WIRESHARK_RUN_AS_USER=root
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

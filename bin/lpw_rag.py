@@ -47,8 +47,12 @@ class PcapRAG:
 
         # Initialize ChromaDB in-memory (session only, no persistence)
         if CHROMADB_AVAILABLE:
-            # Use EphemeralClient for in-memory storage (auto-cleanup on restart)
-            self.client = chromadb.EphemeralClient()
+            # Use Client with ephemeral settings for in-memory storage (auto-cleanup on restart)
+            settings = Settings(
+                is_persistent=False,
+                anonymized_telemetry=False
+            )
+            self.client = chromadb.Client(settings)
 
             # Delete old collection if exists (fresh start each upload)
             try:
