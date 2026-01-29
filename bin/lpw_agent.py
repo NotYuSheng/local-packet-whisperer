@@ -3,14 +3,37 @@ from lpw_init import *
 from crewai import Agent, Task, Crew, LLM
 import yaml
 import os
+import re
 
 class LPWCrew:
+
+    @staticmethod
+    def _validate_server(server: str) -> None:
+        """Validate server address to prevent SSRF attacks."""
+        # Allow localhost, IP addresses, and domain names
+        if not re.match(r'^(?:[a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$|^localhost$|^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', server):
+            raise ValueError(f"Invalid server address: {server}")
+
+    @staticmethod
+    def _validate_port(port) -> None:
+        """Validate port number."""
+        try:
+            port_int = int(port)
+            if not (1 <= port_int <= 65535):
+                raise ValueError(f"Port must be between 1 and 65535: {port}")
+        except (TypeError, ValueError) as e:
+            raise ValueError(f"Invalid port number: {port}") from e
     def __init__(self, llm_host="127.0.0.1", llm_port="11434", model="llama3.1:latest"):
+        # Validate inputs to prevent SSRF attacks
+        self._validate_server(llm_host)
+        self._validate_port(llm_port)
+
         self.llm_host = llm_host
         self.llm_port = llm_port
         self.model = model
         # Add 'openai/' prefix for litellm to recognize OpenAI-compatible endpoints
-        litellm_model = f"openai/{model}" if not model.startswith("openai/") else model
+        # Only add prefix if no provider prefix exists (indicated by '/')
+        litellm_model = f"openai/{model}" if "/" not in model else model
         self.llm = LLM(model=litellm_model, base_url=f'http://{llm_host}:{llm_port}/v1', api_key=os.getenv('OPENAI_API_KEY'))
         self.loadConfig()
         self.crew = Crew(
