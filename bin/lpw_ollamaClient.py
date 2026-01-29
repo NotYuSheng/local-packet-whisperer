@@ -2,17 +2,34 @@ import streamlit as st
 from openai import OpenAI
 from typing import List
 import os
+import re
 
 class OllamaClient():
 
+    @staticmethod
+    def _validate_server(server: str) -> None:
+        """Validate server address to prevent SSRF attacks."""
+        # Allow localhost, IP addresses, and domain names
+        if not re.match(r'^(?:[a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+$|^localhost$|^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$', server):
+            raise ValueError(f"Invalid server address: {server}")
+
+    @staticmethod
+    def _validate_port(port: int) -> None:
+        """Validate port number."""
+        if not isinstance(port, int) or not (1 <= port <= 65535):
+            raise ValueError(f"Invalid port number: {port}")
+
     def __init__(self, server="127.0.0.1"):
         self.messages = []
+        self._validate_server(server)
         self.client = OpenAI(
             base_url=f'http://{server}:11434/v1',
             api_key=os.getenv('OPENAI_API_KEY')
         )
 
     def setServer(self, server, port):
+        self._validate_server(server)
+        self._validate_port(int(port))
         self.client = OpenAI(
             base_url=f'http://{server}:{port}/v1',
             api_key=os.getenv('OPENAI_API_KEY')
