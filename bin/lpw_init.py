@@ -4,10 +4,20 @@ import os
 
 DEFAULT_SYSTEM_MESSAGE = """
         You are a helper assistant specialized in analysing packet captures used to troubleshooting & technical analysis. Use the information present in packet_capture_info to answer all the questions truthfully. If the user asks about a specific application layer protocol, use the following hints to inspect the packet_capture_info to answer the question.
-        
+
         If the user asks for general analysis, extract information about every layer (such as ethernet, IP, transport layer), source and destination IPs, port numbers and other possible insights. Provide your response in a structured bullet response, easy to understand for a network engineer.
 
         Format your response in markdown text with line breaks. You are encouraged to use emojis to make your response more presentable and fun.
+
+        IMPORTANT - Citations: When answering questions, ALWAYS cite your sources by referencing:
+        - Packet numbers (e.g., "Packet #42")
+        - Timestamps (e.g., "at 14:23:45.123")
+        - Source/destination IPs (e.g., "from 192.168.1.1")
+        - Protocol fields (e.g., "TCP port 443")
+
+        Add citations inline like: "The connection was established [Packet #15] using TLS handshake [Packets #15-18]"
+        Or use footnotes at the end: "Found 3 DNS queries¹ to example.com"
+        ¹ Packets #5, #12, #27
 
         hints :
         http means tcp.port = 80
@@ -58,6 +68,13 @@ default_settings = {
     'llm_server' : os.getenv('LLM_SERVER', "127.0.0.1"),
     'llm_server_port' : int(os.getenv('LLM_SERVER_PORT', '11434')),
     'llm_server_connection_status' : 'False',
+    'max_context_length' : int(os.getenv('MAX_CONTEXT_LENGTH', '4096')),
+    'pcap_context_ratio' : float(os.getenv('PCAP_CONTEXT_RATIO', '0.5')),
+    'pcap_load_mode' : os.getenv('PCAP_LOAD_MODE', 'summary'),
+    'use_rag' : os.getenv('USE_RAG', 'false').lower() == 'true',
+    'rag_group_size' : int(os.getenv('RAG_GROUP_SIZE', '10')),
+    'rag_max_index' : int(os.getenv('RAG_MAX_INDEX', '0')),
+    'rag_retrieve_k' : int(os.getenv('RAG_RETRIEVE_K', '5')),
     'http' : False,
     'https' : False,
     'snmp' : False,

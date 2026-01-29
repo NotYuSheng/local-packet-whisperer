@@ -10,16 +10,20 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements first for better caching
-COPY requirements.txt .
+COPY requirements.txt VERSION.txt ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application files
-COPY . .
+# Copy only application code (bin/ and config/)
+COPY bin/ ./bin/
+COPY config/ ./config/
 
 # Create necessary directories
-RUN mkdir -p /root/.lpw/temp /root/.lpw/config
+RUN mkdir -p /root/.lpw/temp /root/.lpw/config /app/.streamlit
+
+# Create Streamlit config for file upload size
+RUN printf "[server]\nmaxUploadSize = 500\n" > /app/.streamlit/config.toml
 
 # Expose Streamlit default port
 EXPOSE 8501

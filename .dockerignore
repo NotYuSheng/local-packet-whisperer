@@ -45,10 +45,12 @@ venv.bak/
 .streamlit/
 
 # Local data
-*.pcap
-*.pcapng
 temp/
 *.log
+
+# Sample files (not needed in Docker)
+sample-files/
+scripts/
 
 # Docker
 Dockerfile
