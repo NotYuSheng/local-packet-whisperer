@@ -148,16 +148,42 @@ with st.sidebar:
     st.metric("Plugged to 🔌 & connection status 🚦", f"{returnValue('llm_server')} {renderConnection(returnValue('llm_server_connection_status'))}")
     getEnabledFilters()
     st.metric("Streaming 〰️", returnValue('streaming_enabled'))
+    st.metric("Context Length 📏", f"{returnValue('max_context_length')} tokens ({int(returnValue('pcap_context_ratio')*100)}% for PCAP)")
+
+    # Show load mode with appropriate emoji
+    load_mode_display = {
+        'full': '🗂️ Full',
+        'summary': '📊 Summary',
+        'quick': '⚡ Quick'
+    }.get(returnValue('pcap_load_mode'), returnValue('pcap_load_mode'))
+    st.metric("PCAP Load Mode 🔄", load_mode_display)
+
     packetFile = st.file_uploader(label='Upload either a PCAP or PCAPNG file to chat', accept_multiple_files=False, type=['pcap','pcapng'])
     if packetFile:
         st.session_state['pcap_fname'] = packetFile.name
-        with st.spinner('#### Crunching the packets... 🥣🥣🥣'):
+        load_mode = returnValue('pcap_load_mode')
+        spinner_text = {
+            'full': '#### Loading full packet data... 🥣🥣🥣',
+            'summary': '#### Generating PCAP summary... 📊📊📊',
+            'quick': '#### Quick sampling PCAP... ⚡⚡⚡'
+        }.get(load_mode, '#### Processing PCAP...')
+
+        with st.spinner(spinner_text):
             with open(f'{packetFile.name}', 'wb') as f:
                 f.write(packetFile.read())
             filters, decodes = getFiltersAndDecodeInfo()
             st.session_state['pcap_filters'] = filters
-            # print(f'#### {st.session_state['pcap_filters']}')
-            st.session_state['pcap_data'] = getPcapData(input_file=f'{packetFile.name}', filter=filters, decode_info=decodes)
+
+            # Choose loading strategy based on PCAP_LOAD_MODE
+            if load_mode == 'summary':
+                st.session_state['pcap_data'] = getPcapSummary(input_file=f'{packetFile.name}', filter=filters)
+                st.info('📊 Using summary mode - statistical overview loaded. Ask questions for detailed packet analysis.', icon='ℹ️')
+            elif load_mode == 'quick':
+                st.session_state['pcap_data'] = getQuickPcapStats(input_file=f'{packetFile.name}', filter=filters)
+                st.info('⚡ Using quick mode - sampled first 1000 packets. Ask questions for detailed analysis.', icon='ℹ️')
+            else:  # 'full' mode
+                st.session_state['pcap_data'] = getPcapData(input_file=f'{packetFile.name}', filter=filters, decode_info=decodes)
+
             initLLM(pcap_data=returnValue('pcap_data'))
             #os.remove(f'{packetFile.name}')
     else:
